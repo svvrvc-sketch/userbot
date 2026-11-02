@@ -16,7 +16,7 @@ services:
       - key: BOT_TOKEN
         value: "9089922346:AAH9POzsPiqL6j9moAThW09t0oDTy_s_r3Q"
       - key: SUPABASE_URL
-        value: "https://gqetxwbveyfliidfyjee.supabase.co"
+        value: "https://sxdhrllgwjijwhrgcoze.supabase.co"
       - key: SUPABASE_KEY
-        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxZXR4d2J2ZXlmbGlpZGZ5amVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2OTE0ODcsImV4cCI6MjEwMTI2NzQ4N30.w-pBjSyhDcExHyb58AG6e--ZioH41w-jkrt9SPJtu9E"
+        value: "sb_publishable_f20KB1RZ8DGbF-Ld9LvI9g_xBGvUKeL"
 

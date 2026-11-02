@@ -32,8 +32,8 @@ WELCOME_MESSAGE = (
 BITRIX_WEBHOOK_URL = "https://bitrix24.owa.uz/rest/721/v3lqvmymdsrk8w7t/"
 TARGET_STATUS_ID = "NEW"
 
-SUPABASE_URL = "https://gqetxwbveyfliidfyjee.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxZXR4d2J2ZXlmbGlpZGZ5amVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2OTE0ODcsImV4cCI6MjEwMTI2NzQ4N30.w-pBjSyhDcExHyb58AG6e--ZioH41w-jkrt9SPJtu9E"
+SUPABASE_URL = "https://sxdhrllgwjijwhrgcoze.supabase.co"
+SUPABASE_KEY = "sb_publishable_f20KB1RZ8DGbF-Ld9LvI9g_xBGvUKeL"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -161,8 +161,20 @@ def get_lead_id_by_user(user_id: int):
 
 
 # ==========================================
-# 5. TELEGRAM HODISALARI (YANGI YOZGAN AKKAUNTGA SALOMLASHISH)
+# 5. TELEGRAM HODISALARI (FAQATGINA YANGI CHATLARGA SALOMLASHISH)
 # ==========================================
+
+async def scan_existing_dialogs():
+    """Mavjud eski chatlarni xotiraga olib, ularga salom bormasligini ta'minlash"""
+    try:
+        count = 0
+        async for dialog in userbot.iter_dialogs(limit=1000):
+            if dialog.is_user:
+                replied_user_ids.add(dialog.id)
+                count += 1
+        print(f"🔒 Jami {count} ta mavjud eski chatlar aniqlandi va himoyalandi.")
+    except Exception as e:
+        print(f"⚠️ Eski dialoglarni olishda xatolik: {e}")
 
 @userbot.on(events.NewMessage(incoming=True))
 async def handle_incoming_message(event):
@@ -173,23 +185,33 @@ async def handle_incoming_message(event):
         return
 
     sender = await event.get_sender()
-    
-    if getattr(sender, 'bot', False):
+    if not sender or getattr(sender, 'bot', False):
         return
 
     sender_id = event.sender_id
     message_text = (event.text or "").strip()
-    is_start = message_text.startswith("/start")
 
-    # 1. YANGI YOZGAN AKKAUNTGA SEKUNDSIZ SALOMLASHISH XABARI YUBORISH
-    if sender_id not in replied_user_ids or is_start:
-        mark_user_greeted(sender_id)
-        
+    # 1. Kontaktda bo'lsa, aslo salom bormaydi
+    if getattr(sender, 'contact', False):
+        replied_user_ids.add(sender_id)
+        return
+
+    # 2. Avval yozilgan bo'lsa, o'tkazib yuborish
+    if sender_id in replied_user_ids:
+        pass
+    else:
+        # 3. Chat tarixini tekshirish (faqat birinchi marta yozgan yangi chatlar uchun)
         try:
-            # Sekundsiz, darhol javob qaytaramiz:
-            await event.reply(WELCOME_MESSAGE)
-            name_display = getattr(sender, 'first_name', '') or str(sender_id)
-            print(f"⚡ Yangi akkauntga sekundsiz salomlashish xabari yuborildi: {name_display} (ID: {sender_id})")
+            history = await userbot.get_messages(sender_id, limit=3)
+            if len(history) > 1:
+                mark_user_greeted(sender_id)
+                print(f"⏩ Eski chat (tarix mavjud). Salom yuborilmadi: {sender_id}")
+            else:
+                # FAQATGINA YANGI CHAT:
+                mark_user_greeted(sender_id)
+                await event.reply(WELCOME_MESSAGE)
+                name_display = getattr(sender, 'first_name', '') or str(sender_id)
+                print(f"⚡ YANGI CHATGA sekundsiz salomlashish xabari yuborildi: {name_display} (ID: {sender_id})")
         except Exception as e:
             print(f"❌ Salomlashish xabarini yuborishda xatolik: {e}")
 
@@ -237,6 +259,9 @@ async def startup_event():
     else:
         await userbot.start()
         print("🚀 Telethon Userbot muvaffaqiyatli ishga tushdi!")
+    
+    import asyncio
+    asyncio.create_task(scan_existing_dialogs())
     print("⚡ Yangi yozgan akkauntlarga salomlashish xizmati faol!")
 
 @app.on_event("shutdown")

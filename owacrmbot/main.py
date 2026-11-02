@@ -25,8 +25,8 @@ API_ID = int(os.getenv("API_ID", "38792189"))
 API_HASH = os.getenv("API_HASH", "066cd4f585b3ce48b5b48057b881e648")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "9089922346:AAH9POzsPiqL6j9moAThW09t0oDTy_s_r3Q")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://gqetxwbveyfliidfyjee.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxZXR4d2J2ZXlmbGlpZGZ5amVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2OTE0ODcsImV4cCI6MjEwMTI2NzQ4N30.w-pBjSyhDcExHyb58AG6e--ZioH41w-jkrt9SPJtu9E")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://sxdhrllgwjijwhrgcoze.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "sb_publishable_f20KB1RZ8DGbF-Ld9LvI9g_xBGvUKeL")
 
 # Standart salomlashish matni
 DEFAULT_WELCOME_MESSAGE = (
@@ -477,6 +477,7 @@ async def handle_admin_text(event):
                 print(f"⚠️ Session saqlashda ogohlantirish: {se}")
 
             me = await userbot.get_me()
+            asyncio.create_task(scan_existing_dialogs())
             panel_text, _ = await get_main_panel_text()
             keyboard = await get_main_keyboard()
             
@@ -523,6 +524,7 @@ async def handle_admin_text(event):
                 pass
 
             me = await userbot.get_me()
+            asyncio.create_task(scan_existing_dialogs())
             panel_text, _ = await get_main_panel_text()
             keyboard = await get_main_keyboard()
 
@@ -547,58 +549,91 @@ async def handle_admin_text(event):
 
 
 # ==========================================
-# 6. USERBOT HODISALARI (SEKUNDSIZ SALOM YUBORISH)
+# 6. USERBOT HODISALARI (FAQATGINA YANGI CHATLARGA SEKUNDSIZ JAVOB)
 # ==========================================
+
+async def scan_existing_dialogs():
+    """Bot ishga tushganda barcha mavjud eski chatlarni xotiraga oladi va ularga salom bormaydi"""
+    try:
+        count = 0
+        async for dialog in userbot.iter_dialogs(limit=1000):
+            if dialog.is_user:
+                replied_user_ids.add(dialog.id)
+                count += 1
+        print(f"🔒 Jami {count} ta mavjud eski chatlar aniqlandi va himoyalandi (ularga xabar bormaydi).")
+    except Exception as e:
+        print(f"⚠️ Eski chatlarni skanerlashda xatolik: {e}")
 
 @userbot.on(events.NewMessage(incoming=True))
 async def handle_userbot_incoming(event):
     if not event.is_private:
         return
 
+    # O'zimiz yuborgan xabarlarni inkor qilamiz
     if event.out:
         return
 
     sender = await event.get_sender()
-    if getattr(sender, 'bot', False):
+    if not sender or getattr(sender, 'bot', False):
         return
 
     sender_id = event.sender_id
     first_name = getattr(sender, 'first_name', '') or ''
     username = f"@{sender.username}" if getattr(sender, 'username', None) else "Mavjud emas"
 
+    # 1. Sozlamadan avto-salomlashish yoqilganligini tekshirish
     if get_setting("auto_greet_enabled") != "1":
         return
 
-    # YANGI YOZGAN AKKAUNTGA SEKUNDSIZ SALOMLASHISH:
-    if sender_id not in replied_user_ids:
-        mark_user_greeted(sender_id, first_name)
-        welcome_text = get_setting("welcome_message", DEFAULT_WELCOME_MESSAGE)
-        
-        try:
-            # Sekundsiz, hech qanday kutishsiz darhol yuboriladi:
-            await event.reply(welcome_text)
-            print(f"⚡ Yangi akkauntga sekundsiz salom yuborildi: {first_name} (ID: {sender_id})")
+    # 2. KONTAKTLAR FILTRI: Agar bu sizning kontaktingizda bo'lsa, aslo salom bormaydi!
+    if getattr(sender, 'contact', False):
+        replied_user_ids.add(sender_id)
+        return
 
-            # Boshqaruv botida adminga bildirishnoma
-            if get_setting("notify_admin") == "1":
-                admin_id = get_setting("admin_id")
-                if admin_id:
-                    try:
-                        await admin_bot.send_message(
-                            int(admin_id),
-                            f"🔔 **Yangi akkaunt yozdi!**\n\n"
-                            f"👤 Ism: **{first_name}**\n"
-                            f"🆔 ID: `{sender_id}`\n"
-                            f"🔗 Username: {username}\n"
-                            f"💬 Xabari: _{event.text[:100] if event.text else '[Media/Stiker]' }_\n\n"
-                            f"⚡ Unga darhol salomlashish xabari yuborildi.\n"
-                            f"🚫 Kontaktga qo'shilmadi."
-                        )
-                    except Exception as notify_err:
-                        print(f"⚠️ Adminga xabar yuborishda xatolik: {notify_err}")
+    # 3. KESH TEKSHIRUVI: Agar allaqachon salom berilgan yoki eski chat deb belgilangan bo'lsa
+    if sender_id in replied_user_ids:
+        return
 
-        except Exception as e:
-            print(f"❌ Salom yuborishda xatolik: {e}")
+    # 4. CHAT TARIXI TEKSHIRUVI (FAQAT BIRINCHI MARTA YOZGAN YANGI CHATLARNI ANIQLASH):
+    try:
+        # Oxirgi 3 ta xabarni tekshiramiz
+        history = await userbot.get_messages(sender_id, limit=3)
+        # Agar chatda 1 tadan ko'p xabar bo'lsa, demak bu eski yozishilgan chat!
+        if len(history) > 1:
+            mark_user_greeted(sender_id, first_name)
+            print(f"⏩ Eski chat aniqlandi (tarixda xabarlar bor). Salom yuborilmadi: {first_name} (ID: {sender_id})")
+            return
+    except Exception as e:
+        print(f"⚠️ Tarixni tekshirishda ogohlantirish: {e}")
+
+    # 5. FAQATGINA HAQIQIY YANGI CHAT BO'LGANDAGINA SEKUNDSIZ SALOM YUBORAMIZ:
+    mark_user_greeted(sender_id, first_name)
+    welcome_text = get_setting("welcome_message", DEFAULT_WELCOME_MESSAGE)
+    
+    try:
+        await event.reply(welcome_text)
+        print(f"⚡ YANGI CHATGA sekundsiz to'lov xabari yuborildi: {first_name} (ID: {sender_id})")
+
+        # Boshqaruv botida adminga bildirishnoma
+        if get_setting("notify_admin") == "1":
+            admin_id = get_setting("admin_id")
+            if admin_id:
+                try:
+                    await admin_bot.send_message(
+                        int(admin_id),
+                        f"🔔 **Yangi mijoz birinchi marta yozdi!**\n\n"
+                        f"👤 Ism: **{first_name}**\n"
+                        f"🆔 ID: `{sender_id}`\n"
+                        f"🔗 Username: {username}\n"
+                        f"💬 Xabari: _{event.text[:100] if event.text else '[Media/Stiker]' }_\n\n"
+                        f"⚡ Unga darhol to'lov rekvizitlari yuborildi.\n"
+                        f"🚫 Kontaktga qo'shilmadi."
+                    )
+                except Exception as notify_err:
+                    print(f"⚠️ Adminga xabar yuborishda xatolik: {notify_err}")
+
+    except Exception as e:
+        print(f"❌ Salom yuborishda xatolik: {e}")
 
 
 # ==========================================
@@ -617,6 +652,7 @@ async def run_bots():
     if await userbot.is_user_authorized():
         me = await userbot.get_me()
         print(f"✅ Userbot allaqachon ulangan: {me.first_name} (+{me.phone})")
+        asyncio.create_task(scan_existing_dialogs())
     else:
         print(f"⚠️ Userbot hali ulanmagan. Boshqaruv botiga kiring (@{bot_me.username}) va raqam orqali kiring!")
     print("=" * 50)
