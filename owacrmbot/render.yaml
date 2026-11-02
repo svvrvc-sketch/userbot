@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: owacrm-userbot
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
+      - key: API_ID
+        value: "38792189"
+      - key: API_HASH
+        value: "066cd4f585b3ce48b5b48057b881e648"
+      - key: BOT_TOKEN
+        value: "9089922346:AAH9POzsPiqL6j9moAThW09t0oDTy_s_r3Q"
+      - key: SUPABASE_URL
+        value: "https://gqetxwbveyfliidfyjee.supabase.co"
+      - key: SUPABASE_KEY
+        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxZXR4d2J2ZXlmbGlpZGZ5amVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2OTE0ODcsImV4cCI6MjEwMTI2NzQ4N30.w-pBjSyhDcExHyb58AG6e--ZioH41w-jkrt9SPJtu9E"
+
